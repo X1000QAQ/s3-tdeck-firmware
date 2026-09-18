@@ -38,8 +38,13 @@
 #define BUTTON_ACTIVE_PULLUP true
 
 #define GPS_DEFAULT_NOT_PRESENT 1
-#define GPS_RX_PIN 44
-#define GPS_TX_PIN 43
+
+// ---- Step2 硬件适配（本板克隆板）----
+#define PIN_BUZZER 6      // 蜂鸣器 GPIO6（反编译商家 v279 确认，PWM 驱动）
+#define PCF8563_RTC 0x51  // 板上 PCF8563 RTC（2.7.26 用 SensorLib → 宏放 variant.h，与 tbeam-s3-core 同款）
+#define TCXO_OPTIONAL     // 先按 TCXO 1.8V 试，失败自动退回 XTAL（与商家 v279 一致）
+#define GPS_RX_PIN 19 // Step2 硬件适配：本板实测 RX=GPIO19（非官方 44）
+#define GPS_TX_PIN 20 // Step2 硬件适配：本板实测 TX=GPIO20（非官方 43）
 
 // Have SPI interface SD card slot
 // #define HAS_SDCARD // --> needs to be in platform.ini for device-ui
@@ -52,7 +57,7 @@
 
 #define BATTERY_PIN 4 // A battery voltage measurement pin, voltage divider connected here to measure battery voltage
 // ratio of voltage divider = 2.0 (RD2=100k, RD3=100k)
-#define ADC_MULTIPLIER 2.11 // 2.0 + 10% for correction of display undervoltage.
+#define ADC_MULTIPLIER 2.0   // 2026-09-19 改回真实分压比（官方原理图 RD2/RD3=100K/100K ⇒ 2.0）；2.11 会让满电上报 ~4.42V 永久越过 4200mV 充电阈 // 2.0 + 10% for correction of display undervoltage.
 #define ADC_CHANNEL ADC1_GPIO4_CHANNEL
 
 // keyboard

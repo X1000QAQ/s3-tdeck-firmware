@@ -24,6 +24,9 @@ PacketAPI::PacketAPI(PacketServer *_server)
 
 int32_t PacketAPI::runOnce()
 {
+    // V24: server 未就绪时不能解引用 —— 否则 App 走"网络发现"连接时 loopTask 直接 panic。
+    if (!server)
+        return 1000;
     bool success = false;
 #ifndef ARCH_PORTDUINO
     if (config.bluetooth.enabled) {
