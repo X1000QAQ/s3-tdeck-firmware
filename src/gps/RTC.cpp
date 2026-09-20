@@ -123,6 +123,9 @@ RTCSetResult readFromRTC()
             RTCQuality oldQuality = currentQuality;
             timeStartMsec = now;
             zeroOffsetSecs = tv.tv_sec;
+            #if defined(ARCH_ESP32) || defined(ARCH_RP2040)
+            settimeofday(&tv, NULL); // v61: 官方 #11494 移植 —— 同步 POSIX 系统时钟（device-ui 的 time() 依赖它）
+            #endif
             currentQuality = RTCQualityDevice;
             triggerNodeInfoCheckOnTimeSource(oldQuality, currentQuality);
         }
@@ -169,6 +172,9 @@ RTCSetResult readFromRTC()
             RTCQuality oldQuality = currentQuality;
             timeStartMsec = now;
             zeroOffsetSecs = tv.tv_sec;
+            #if defined(ARCH_ESP32) || defined(ARCH_RP2040)
+            settimeofday(&tv, NULL); // v61: 官方 #11494 移植 —— 同步 POSIX 系统时钟（device-ui 的 time() 依赖它）
+            #endif
             currentQuality = RTCQualityDevice;
             triggerNodeInfoCheckOnTimeSource(oldQuality, currentQuality);
         }
@@ -205,6 +211,9 @@ RTCSetResult readFromRTC()
                 RTCQuality oldQuality = currentQuality;
                 timeStartMsec = now;
                 zeroOffsetSecs = tv.tv_sec;
+                #if defined(ARCH_ESP32) || defined(ARCH_RP2040)
+                settimeofday(&tv, NULL); // v61: 官方 #11494 移植 —— 同步 POSIX 系统时钟（device-ui 的 time() 依赖它）
+                #endif
                 currentQuality = RTCQualityDevice;
                 triggerNodeInfoCheckOnTimeSource(oldQuality, currentQuality);
             }

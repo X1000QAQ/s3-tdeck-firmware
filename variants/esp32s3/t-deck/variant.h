@@ -23,7 +23,10 @@
 #define SCREEN_TRANSITION_FRAMERATE 5
 #define BRIGHTNESS_DEFAULT 130 // Medium Low Brightness
 #define USE_TFTDISPLAY 1
-#define HAS_PHYSICAL_KEYBOARD 1
+// v33: 本克隆板【没有】T-Deck 官方键盘（输入是摇杆 encoder + 触摸）
+// 但官方变体启用了 HAS_PHYSICAL_KEYBOARD ⇒ 固件每 ~50ms 去敲 0x55 键盘
+// ⇒ 397 次/分钟 I²C 超时错误刷屏（实测定点：addr=0x55）
+// #define HAS_PHYSICAL_KEYBOARD 1
 
 #define HAS_TOUCHSCREEN 1
 #define SCREEN_TOUCH_INT 16
@@ -41,6 +44,8 @@
 
 // ---- Step2 硬件适配（本板克隆板）----
 #define PIN_BUZZER 6      // 蜂鸣器 GPIO6（反编译商家 v279 确认，PWM 驱动）
+// v35: 恢复 RTC —— 点名探针证明 20Hz 噪声元凶是【键盘 0x55】(v33 已修)，RTC 清白。
+// 用户已更换 RTC 备份电池 ⇒ 验证时间能否跨重启保留。
 #define PCF8563_RTC 0x51  // 板上 PCF8563 RTC（2.7.26 用 SensorLib → 宏放 variant.h，与 tbeam-s3-core 同款）
 #define TCXO_OPTIONAL     // 先按 TCXO 1.8V 试，失败自动退回 XTAL（与商家 v279 一致）
 #define GPS_RX_PIN 19 // Step2 硬件适配：本板实测 RX=GPIO19（非官方 44）
@@ -53,7 +58,7 @@
 #define SPI_MISO (38)
 #define SPI_CS (39)
 #define SDCARD_CS SPI_CS
-#define SD_SPI_FREQUENCY 75000000U
+#define SD_SPI_FREQUENCY 50000000U
 
 #define BATTERY_PIN 4 // A battery voltage measurement pin, voltage divider connected here to measure battery voltage
 // ratio of voltage divider = 2.0 (RD2=100k, RD3=100k)
@@ -114,3 +119,7 @@
 #define SX126X_DIO3_TCXO_VOLTAGE 1.8
 // Internally the TTGO module hooks the SX1262-DIO2 in to control the TX/RX switch (which is the default for the sx1262interface
 // code)
+
+// 本克隆板无 T-Deck 官方键盘（输入=摇杆 encoder + 触摸）
+// 关闭 UI 库里的键盘 I²C 轮询（0x55）—— 那是 20Hz 报错的真源头
+#define TDECK_NO_I2C_KEYBOARD 1

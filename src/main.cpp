@@ -199,6 +199,9 @@ bool osk_found = false;
 
 // The I2C address of the RTC Module (if found)
 ScanI2C::DeviceAddress rtc_found = ScanI2C::ADDRESS_NONE;
+// v63: UI/触摸初始化完成标志 —— 官方原则：触摸初始化会把 I2C 外设 BUSY 卡住 ✗
+// 所以任何自发的 I2C 动作（总线恢复/传感器/RTC 发现）都必须等 UI 就绪之后再开始 ✓
+bool uiReady = false;
 // The I2C address of the Accelerometer (if found)
 ScanI2C::DeviceAddress accelerometer_found = ScanI2C::ADDRESS_NONE;
 // The I2C address of the Magnetometer (if found)
@@ -695,6 +698,17 @@ void setup()
     scannerToSensorsMap(i2cScanner, ScanI2C::DeviceType::MLX90614, meshtastic_TelemetrySensorType_MLX90614);
     scannerToSensorsMap(i2cScanner, ScanI2C::DeviceType::ICM20948, meshtastic_TelemetrySensorType_ICM20948);
     scannerToSensorsMap(i2cScanner, ScanI2C::DeviceType::MAX30102, meshtastic_TelemetrySensorType_MAX30102);
+
+    // v48: 【忠实移植 2.7.9】—— 新版把环境传感器的登记整段删掉了，
+    // 导致 hasSensor() 恒假 ⇒ 驱动永远不初始化（商业固件 2.7.9 系保留着这几行，所以能用）
+    scannerToSensorsMap(i2cScanner, ScanI2C::DeviceType::BME_680, meshtastic_TelemetrySensorType_BME680);
+    scannerToSensorsMap(i2cScanner, ScanI2C::DeviceType::BME_280, meshtastic_TelemetrySensorType_BME280);
+    scannerToSensorsMap(i2cScanner, ScanI2C::DeviceType::BMP_280, meshtastic_TelemetrySensorType_BMP280);
+    scannerToSensorsMap(i2cScanner, ScanI2C::DeviceType::BMP_3XX, meshtastic_TelemetrySensorType_BMP3XX);
+    scannerToSensorsMap(i2cScanner, ScanI2C::DeviceType::BMP_085, meshtastic_TelemetrySensorType_BMP085);
+    scannerToSensorsMap(i2cScanner, ScanI2C::DeviceType::MCP9808, meshtastic_TelemetrySensorType_MCP9808);
+    scannerToSensorsMap(i2cScanner, ScanI2C::DeviceType::SHT31, meshtastic_TelemetrySensorType_SHT31);
+    scannerToSensorsMap(i2cScanner, ScanI2C::DeviceType::SHTC3, meshtastic_TelemetrySensorType_SHTC3);
 #endif
 
 #ifdef HAS_SDCARD
@@ -983,6 +997,9 @@ void setup()
 #else
     if (screen_found.port != ScanI2C::I2CPort::NO_I2C && screen)
         screen->setup();
+    // v63: 【UI 就绪】—— 此刻触摸/显示已初始化完毕 ⇒ 之后才能碰 I2C ✓
+    uiReady = true;
+    LOG_INFO("v63: UI ready, I2C operations unlocked");
 #endif
 #endif
 

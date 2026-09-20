@@ -136,7 +136,7 @@ void Channels::initDefaultChannel(ChannelIndex chIndex)
     channelSettings.psk.bytes[0] = defaultpskIndex;
     channelSettings.psk.size = 1;
     strncpy(channelSettings.name, "", sizeof(channelSettings.name));
-    channelSettings.module_settings.position_precision = 13; // default to sending location on the primary channel
+    channelSettings.module_settings.position_precision = 32; // v25: 默认精确(32)；13 会把位置量化到 ~5.8km 网格
     channelSettings.has_module_settings = true;
 
     ch.has_settings = true;

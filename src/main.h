@@ -34,6 +34,7 @@ extern uint8_t kb_model;
 extern bool kb_found;
 extern bool osk_found;
 extern ScanI2C::DeviceAddress rtc_found;
+extern bool uiReady; // v63: UI/触摸初始化完成（在此之前禁止自发 I2C 动作）
 extern ScanI2C::DeviceAddress accelerometer_found;
 extern ScanI2C::DeviceAddress magnetometer_found;
 extern ScanI2C::FoundDevice rgb_found;

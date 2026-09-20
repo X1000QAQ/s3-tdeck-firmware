@@ -15,6 +15,8 @@ class BMP280Sensor : public TelemetrySensor
     BMP280Sensor();
     virtual bool getMetrics(meshtastic_Telemetry *measurement) override;
     virtual bool initDevice(TwoWire *bus, ScanI2C::FoundDevice *dev) override;
+    // v38: 2.7.9 式延迟初始化（不接收扫描器指针，改从全局 nodeTelemetrySensorsMap 取总线/地址）
+    virtual int32_t runOnce() override;
 };
 
 #endif

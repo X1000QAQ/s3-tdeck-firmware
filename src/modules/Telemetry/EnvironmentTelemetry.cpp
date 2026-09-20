@@ -48,6 +48,9 @@ extern void drawCommonHeader(OLEDDisplay *display, int16_t x, int16_t y, const c
 
 #if __has_include(<Adafruit_BMP280.h>)
 #include "Sensor/BMP280Sensor.h"
+
+// v38: 2.7.9 式全局实例（延迟初始化用）
+BMP280Sensor bmp280Sensor;
 #endif
 
 #if __has_include(<Adafruit_LTR390.h>)
@@ -155,31 +158,52 @@ void EnvironmentTelemetryModule::i2cScanFinished(ScanI2C *i2cScanner)
     }
     LOG_INFO("Environment Telemetry adding I2C devices...");
 
+    // v40: 【关键】把 BMP280 补进全局 nodeTelemetrySensorsMap ——
+    // main.cpp 的 scannerToSensorsMap() 只覆盖 INA/磁力计等类型，BMP280/BME280/BMP085 都没填，
+    // 导致 hasSensor() 恒为 false ⇒ 延迟初始化被跳过 ⇒ 不崩但也没数据。
+    // 这里用扫描器自己的设备表（能找到 BMP280）补齐该格。
+    {
+        auto foundBmp = i2cScanner->find(ScanI2C::DeviceType::BMP_280);
+        if (foundBmp.type != ScanI2C::DeviceType::NONE) {
+            nodeTelemetrySensorsMap[meshtastic_TelemetrySensorType_BMP280].first = foundBmp.address.address;
+            nodeTelemetrySensorsMap[meshtastic_TelemetrySensorType_BMP280].second =
+                ScanI2CTwoWire::fetchI2CBus(foundBmp.address);   // 静态方法 ✓
+            LOG_INFO("Environment Telemetry: BMP280 mapped (addr=0x%02X) for deferred init (v40)",
+                     foundBmp.address.address);
+
+            // v45: 【立刻】用自写驱动初始化 —— 此时刚扫描完、LovyanGFX(触摸) 还没接管 I2C 总线，
+            // 是最可靠的窗口。延后初始化(v38~v44)时总线已被触摸驱动弄脏 ⇒ chip id 读不到(-99)。
+            LOG_INFO("Environment Telemetry: early BMP280 init at scan time (v45)");
+            bmp280Sensor.runOnce();
+        }
+    }
+
     // order by priority of metrics/values (low top, high bottom)
 
 #if !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
 #ifdef T1000X_SENSOR_EN
     // Not a real I2C device
-    addSensor<T1000xSensor>(i2cScanner, ScanI2C::DeviceType::NONE);
+    // v28 精简：addSensor<T1000xSensor>(i2cScanner, ScanI2C::DeviceType::NONE);   // 非本机传感器，探测会拖死 I2C 总线
 #else
 #ifdef SENSECAP_INDICATOR
     // Not a real I2C device, uses UART
-    addSensor<IndicatorSensor>(i2cScanner, ScanI2C::DeviceType::NONE);
+    // v28 精简：addSensor<IndicatorSensor>(i2cScanner, ScanI2C::DeviceType::NONE);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
-    addSensor<RCWL9620Sensor>(i2cScanner, ScanI2C::DeviceType::RCWL9620);
-    addSensor<CGRadSensSensor>(i2cScanner, ScanI2C::DeviceType::CGRADSENS);
+    // v28 精简：addSensor<RCWL9620Sensor>(i2cScanner, ScanI2C::DeviceType::RCWL9620);   // 非本机传感器，探测会拖死 I2C 总线
+    // v28 精简：addSensor<CGRadSensSensor>(i2cScanner, ScanI2C::DeviceType::CGRADSENS);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 #endif
 
 #if !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR && !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR_EXTERNAL
 #if __has_include(<DFRobot_LarkWeatherStation.h>)
-    addSensor<DFRobotLarkSensor>(i2cScanner, ScanI2C::DeviceType::DFROBOT_LARK);
+    // v28 精简：addSensor<DFRobotLarkSensor>(i2cScanner, ScanI2C::DeviceType::DFROBOT_LARK);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 #if __has_include(<DFRobot_RainfallSensor.h>)
-    addSensor<DFRobotGravitySensor>(i2cScanner, ScanI2C::DeviceType::DFROBOT_RAIN);
+    // v28 精简：addSensor<DFRobotGravitySensor>(i2cScanner, ScanI2C::DeviceType::DFROBOT_RAIN);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 #if __has_include(<Adafruit_AHTX0.h>)
-    addSensor<AHT10Sensor>(i2cScanner, ScanI2C::DeviceType::AHT10);
+    // v27: 0x38 被触摸屏 FT6236 占用，I2C 扫描会把它误认成 AHT10 导致初始化失败/重启循环
+    // addSensor<AHT10Sensor>(i2cScanner, ScanI2C::DeviceType::AHT10);
 #endif
 #if __has_include(<Adafruit_BMP085.h>)
     addSensor<BMP085Sensor>(i2cScanner, ScanI2C::DeviceType::BMP_085);
@@ -188,62 +212,63 @@ void EnvironmentTelemetryModule::i2cScanFinished(ScanI2C *i2cScanner)
     addSensor<BME280Sensor>(i2cScanner, ScanI2C::DeviceType::BME_280);
 #endif
 #if __has_include(<Adafruit_LTR390.h>)
-    addSensor<LTR390UVSensor>(i2cScanner, ScanI2C::DeviceType::LTR390UV);
+    // v28 精简：addSensor<LTR390UVSensor>(i2cScanner, ScanI2C::DeviceType::LTR390UV);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 #if __has_include(<bsec2.h>) || __has_include(<Adafruit_BME680.h>)
-    addSensor<BME680Sensor>(i2cScanner, ScanI2C::DeviceType::BME_680);
+    // v28 精简：addSensor<BME680Sensor>(i2cScanner, ScanI2C::DeviceType::BME_680);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 #if __has_include(<Adafruit_BMP280.h>)
-    addSensor<BMP280Sensor>(i2cScanner, ScanI2C::DeviceType::BMP_280);
+    // v38: 改由模块 runOnce() 延迟初始化（2.7.9 式），见下方 deferredInit
+    // addSensor<BMP280Sensor>(i2cScanner, ScanI2C::DeviceType::BMP_280);
 #endif
 #if __has_include(<Adafruit_DPS310.h>)
-    addSensor<DPS310Sensor>(i2cScanner, ScanI2C::DeviceType::DPS310);
+    // v28 精简：addSensor<DPS310Sensor>(i2cScanner, ScanI2C::DeviceType::DPS310);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 #if __has_include(<Adafruit_MCP9808.h>)
-    addSensor<MCP9808Sensor>(i2cScanner, ScanI2C::DeviceType::MCP9808);
+    // v28 精简：addSensor<MCP9808Sensor>(i2cScanner, ScanI2C::DeviceType::MCP9808);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 #if __has_include(<Adafruit_SHT31.h>)
-    addSensor<SHT31Sensor>(i2cScanner, ScanI2C::DeviceType::SHT31);
+    // v28 精简：addSensor<SHT31Sensor>(i2cScanner, ScanI2C::DeviceType::SHT31);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 #if __has_include(<Adafruit_LPS2X.h>)
-    addSensor<LPS22HBSensor>(i2cScanner, ScanI2C::DeviceType::LPS22HB);
+    // v28 精简：addSensor<LPS22HBSensor>(i2cScanner, ScanI2C::DeviceType::LPS22HB);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 #if __has_include(<Adafruit_SHTC3.h>)
-    addSensor<SHTC3Sensor>(i2cScanner, ScanI2C::DeviceType::SHTC3);
+    // v28 精简：addSensor<SHTC3Sensor>(i2cScanner, ScanI2C::DeviceType::SHTC3);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 #if __has_include("RAK12035_SoilMoisture.h") && defined(RAK_4631) && RAK_4631 == 1
-    addSensor<RAK12035Sensor>(i2cScanner, ScanI2C::DeviceType::RAK12035);
+    // v28 精简：addSensor<RAK12035Sensor>(i2cScanner, ScanI2C::DeviceType::RAK12035);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 #if __has_include(<Adafruit_VEML7700.h>)
-    addSensor<VEML7700Sensor>(i2cScanner, ScanI2C::DeviceType::VEML7700);
+    // v28 精简：addSensor<VEML7700Sensor>(i2cScanner, ScanI2C::DeviceType::VEML7700);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 #if __has_include(<Adafruit_TSL2591.h>)
-    addSensor<TSL2591Sensor>(i2cScanner, ScanI2C::DeviceType::TSL2591);
+    // v28 精简：addSensor<TSL2591Sensor>(i2cScanner, ScanI2C::DeviceType::TSL2591);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 #if __has_include(<ClosedCube_OPT3001.h>)
-    addSensor<OPT3001Sensor>(i2cScanner, ScanI2C::DeviceType::OPT3001);
+    // v28 精简：addSensor<OPT3001Sensor>(i2cScanner, ScanI2C::DeviceType::OPT3001);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 #if __has_include(<Adafruit_SHT4x.h>)
-    addSensor<SHT4XSensor>(i2cScanner, ScanI2C::DeviceType::SHT4X);
+    // v28 精简：addSensor<SHT4XSensor>(i2cScanner, ScanI2C::DeviceType::SHT4X);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 #if __has_include(<SparkFun_MLX90632_Arduino_Library.h>)
-    addSensor<MLX90632Sensor>(i2cScanner, ScanI2C::DeviceType::MLX90632);
+    // v28 精简：addSensor<MLX90632Sensor>(i2cScanner, ScanI2C::DeviceType::MLX90632);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 
 #if __has_include(<Adafruit_BMP3XX.h>)
-    addSensor<BMP3XXSensor>(i2cScanner, ScanI2C::DeviceType::BMP_3XX);
+    // v28 精简：addSensor<BMP3XXSensor>(i2cScanner, ScanI2C::DeviceType::BMP_3XX);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 #if __has_include(<Adafruit_PCT2075.h>)
-    addSensor<PCT2075Sensor>(i2cScanner, ScanI2C::DeviceType::PCT2075);
+    // v28 精简：addSensor<PCT2075Sensor>(i2cScanner, ScanI2C::DeviceType::PCT2075);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 #if __has_include(<Adafruit_TSL2561_U.h>)
-    addSensor<TSL2561Sensor>(i2cScanner, ScanI2C::DeviceType::TSL2561);
+    // v28 精简：addSensor<TSL2561Sensor>(i2cScanner, ScanI2C::DeviceType::TSL2561);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 #if __has_include(<SparkFun_Qwiic_Scale_NAU7802_Arduino_Library.h>)
-    addSensor<NAU7802Sensor>(i2cScanner, ScanI2C::DeviceType::NAU7802);
+    // v28 精简：addSensor<NAU7802Sensor>(i2cScanner, ScanI2C::DeviceType::NAU7802);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 #if __has_include(<BH1750_WE.h>)
-    addSensor<BH1750Sensor>(i2cScanner, ScanI2C::DeviceType::BH1750);
+    // v28 精简：addSensor<BH1750Sensor>(i2cScanner, ScanI2C::DeviceType::BH1750);   // 非本机传感器，探测会拖死 I2C 总线
 #endif
 
 #endif
@@ -251,6 +276,19 @@ void EnvironmentTelemetryModule::i2cScanFinished(ScanI2C *i2cScanner)
 
 int32_t EnvironmentTelemetryModule::runOnce()
 {
+    // v38: 2.7.9 式延迟初始化 —— 在开机窗口之后才碰 I2C 传感器
+    if (firstTime) {
+        firstTime = 0;
+        LOG_INFO("Environment Telemetry: deferred sensor init (v38)");
+        {
+            // v49: 无条件调用（驱动内部自己去探测），并把对象挂进读数列表
+            bmp280Sensor.runOnce();
+            // v39: 【关键】注册进 sensors 列表 —— getEnvironmentTelemetry() 是遍历这个列表读数的，
+            // 只初始化不注册 ⇒ 不会崩但也没有任何数据（v38 的漏项）
+            sensors.push_front(&bmp280Sensor);
+            LOG_INFO("Environment Telemetry: BMP280 registered to sensors list (v49)");
+        }
+    }
     if (sleepOnNextExecution == true) {
         sleepOnNextExecution = false;
         uint32_t nightyNightMs = Default::getConfiguredOrDefaultMs(moduleConfig.telemetry.environment_update_interval,

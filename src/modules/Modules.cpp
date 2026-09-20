@@ -191,7 +191,10 @@ void setupModules()
 #if HAS_TELEMETRY && HAS_SENSOR && !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
     if (moduleConfig.has_telemetry &&
         (moduleConfig.telemetry.environment_measurement_enabled || moduleConfig.telemetry.environment_screen_enabled)) {
-        new EnvironmentTelemetryModule();
+        // v34: 【不创建】环境遥测模块 —— 即使总线干净（v33 已关键盘），
+        // 该模块一开仍会导致无限重启（与上游 issue #5245 一致）。
+        // 传感器暂时停用；设备稳定优先。键盘 0x55 的噪声问题已在 v33 修掉。
+        new EnvironmentTelemetryModule();   // v38: 开（已改延迟初始化）
     }
 #if HAS_TELEMETRY && HAS_SENSOR && !MESHTASTIC_EXCLUDE_AIR_QUALITY_SENSOR
     if (moduleConfig.has_telemetry &&
