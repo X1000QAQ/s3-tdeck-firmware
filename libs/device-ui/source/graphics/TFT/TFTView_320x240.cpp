@@ -1176,7 +1176,7 @@ void TFTView_320x240::ui_event_NodeButton(lv_event_t *e)
             int32_t height = lv_obj_get_height(currentPanel);
             lv_anim_init(&a);
             lv_anim_set_var(&a, currentPanel);
-            lv_anim_set_values(&a, height, 136 - height);
+            lv_anim_set_values(&a, height, 53); // v70: 原为 136-height ✗（53→83 反而不够，MSL 行被裁）
             lv_anim_set_duration(&a, 200);
             lv_anim_set_exec_cb(&a, ui_anim_node_panel_cb);
             lv_anim_set_path_cb(&a, lv_anim_path_linear);
@@ -1190,7 +1190,7 @@ void TFTView_320x240::ui_event_NodeButton(lv_event_t *e)
             int32_t height = lv_obj_get_height(panel);
             lv_anim_init(&a);
             lv_anim_set_var(&a, panel);
-            lv_anim_set_values(&a, height, 136 - height);
+            lv_anim_set_values(&a, height, 100); // v70: 展开高 100 —— 容下 y=63 的 MSL/遥测行（含边框内边距 ✓）
             lv_anim_set_duration(&a, 200);
             lv_anim_set_exec_cb(&a, ui_anim_node_panel_cb);
             lv_anim_set_path_cb(&a, lv_anim_path_linear);
@@ -5346,9 +5346,11 @@ void TFTView_320x240::updatePosition(uint32_t nodeNum, int32_t lat, int32_t lon,
         sprintf(buf, "%.5f %.5f", lat * 1e-7, lon * 1e-7);
         lv_obj_t *panel = nodes[nodeNum];
         lv_label_set_text(panel->LV_OBJ_IDX(node_pos1_idx), buf);
+        // v70: 补 else —— 原写法第二句无条件覆盖，卫星数永远不显示 ✗
         if (sats)
             sprintf(buf, "%d%s MSL  %u sats", altU, units, sats);
-        sprintf(buf, "%d%s MSL", altU, units);
+        else
+            sprintf(buf, "%d%s MSL", altU, units);
         lv_label_set_text(panel->LV_OBJ_IDX(node_pos2_idx), buf);
         // store lat/lon in user_data, because we need these values later to calculate the distance to us
         panel->LV_OBJ_IDX(node_pos1_idx)->user_data = (void *)lat;
