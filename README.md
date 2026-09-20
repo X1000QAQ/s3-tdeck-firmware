@@ -45,7 +45,14 @@ python -m esptool --chip esp32s3 --port <COM> write-flash 0x10000 <bin>
 - 本分支基于 **Meshtastic firmware**（**GPLv3**）✓ ⇒ 本分支同样以 **GPLv3** 发布 ✓
   （见仓库根 `LICENSE`；上游原文见 `README-upstream.md`）
 - 上游项目：https://github.com/meshtastic/firmware
-- 硬件与思路上受一位热爱 LoRa 的朋友启发（其自制小板与配套资料为闭源，**未包含在本仓库** ✓）
+
+### 特别致谢
+
+- 本项目适配的硬件（T-Deck 克隆板）由 **arkbird**（闲鱼）**自行设计并免费分享** ✓
+  —— 他也是 LoRa 爱好者，把自己做的 **S3（T-Deck）** 与 **C3（Lora_C3_v1.4）**
+  两套小板连同配套资料一起分享给了我，本项目的折腾才有起点 ✓
+- ⚠️ arkbird 提供的**原始固件为闭源** ✗ ⇒ **未包含在本仓库** ✓
+  （本仓库只包含基于 Meshtastic 开源部分 + 我自己的修改 ✓ 请勿向本仓库索取其固件 ✗）
 
 ## 免责
 
