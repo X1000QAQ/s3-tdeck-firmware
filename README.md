@@ -35,10 +35,22 @@ cd <repo>
 
 ## 烧录
 
+**常规升级**（设备已在跑 Meshtastic）—— 在偏移 `0x10000` 写 app 即可 ✓：
+
+```bash
+python -m esptool --chip esp32s3 --port <COM> write-flash 0x10000 <app.bin>
 ```
-偏移 0x10000（应用分区）· esptool 写 flash · 设备进下载模式（按住中键 + 插 USB）
-python -m esptool --chip esp32s3 --port <COM> write-flash 0x10000 <bin>
+
+**空板 / 分区表被改过** —— 用整片（factory）从 `0x0` 写 ✓（含 bootloader + 分区表 + app）：
+
+```bash
+python -m esptool --chip esp32s3 --port <COM> write-flash 0x0 <factory.bin>
 ```
+
+⚠️ 两种方式**不要混用** ✗（只写 app 就够的场景别顺手全擦 ✓）
+（设备进下载模式：按住中键 + 插 USB ✓）
+
+> 预编译固件见 [Releases](https://github.com/X1000QAQ/s3-tdeck-firmware/releases) ✓
 
 ## 许可与致谢
 
