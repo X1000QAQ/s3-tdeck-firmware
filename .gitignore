@@ -56,3 +56,14 @@ CMakeLists.txt
 .python3
 .claude/scheduled_tasks.lock
 userPrefs.jsonc.mcp-session-bak
+
+# ★ 内嵌的 UI 库（libs/device-ui）必须完整提交 ✗ 否则 clone 后编不过
+#   （上游 .gitignore 有裸规则 `CMakeLists.txt`，会误伤内嵌库的关键构建文件）
+!libs/device-ui/CMakeLists.txt
+!libs/device-ui/cmake/**
+
+# 本项目补充
+*.bak-*
+*.orig
+*.rej
+__pycache__/

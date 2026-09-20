@@ -1,39 +1,52 @@
-<div align="center" markdown="1">
+# T-Deck（ESP32-S3）自定义固件 —— 中文版 / 地图与 RTC 修复
 
-<img src=".github/meshtastic_logo.png" alt="Meshtastic Logo" width="80"/>
-<h1>Meshtastic Firmware</h1>
+> 基于 **Meshtastic firmware v2.7.26** 的**个人定制分支** ✓
+> 目标平台：**T-Deck 克隆板**（ESP32-S3，无官方键盘，硬件与官方变体有多处差异）
 
-![GitHub release downloads](https://img.shields.io/github/downloads/meshtastic/firmware/total)
-[![CI](https://img.shields.io/github/actions/workflow/status/meshtastic/firmware/main_matrix.yml?branch=master&label=actions&logo=github&color=yellow)](https://github.com/meshtastic/firmware/actions/workflows/ci.yml)
-[![CLA assistant](https://cla-assistant.io/readme/badge/meshtastic/firmware)](https://cla-assistant.io/meshtastic/firmware)
-[![Fiscal Contributors](https://opencollective.com/meshtastic/tiers/badge.svg?label=Fiscal%20Contributors&color=deeppink)](https://opencollective.com/meshtastic/)
-[![Vercel](https://img.shields.io/static/v1?label=Powered%20by&message=Vercel&style=flat&logo=vercel&color=000000)](https://vercel.com?utm_source=meshtastic&utm_campaign=oss)
+## 这个分支做了什么
 
-<a href="https://trendshift.io/repositories/5524" target="_blank"><img src="https://trendshift.io/api/badge/repositories/5524" alt="meshtastic%2Ffirmware | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
+| 方向 | 内容 |
+|---|---|
+| **地图** | 修复"瓦片全灰"根因：地图中心 4 级来源（GPS>home>节点中心>默认）**无任何校验** ✗ ⇒ 非法纬度使 Web Mercator 算出 `yTile=0`（北极）⇒ 全灰且**完全静默** ✗ ⇒ 现新增统一校验 `sanitize()` 并让四来源全部过校验 ✓ |
+| **时间** | 移植上游 `#11494`（RTC/NTP 时同步）：RTC 读取路径补 `settimeofday()` ⇒ POSIX 系统时钟同步 ⇒ UI 显示真实时间 ✓；另补 RTC 发现（开机 I²C 扫描扫不到时，在总线恢复后补探 `0x51`）✓ |
+| **传感器** | 自写 BMP280/BME280 裸 I²C 驱动（避免通用库 `wire.begin()` 重配总线 ✗）+ 开机**一次性**总线恢复 + 有界重试 ✓ |
+| **汉化** | 界面中文；预设下拉保持英文 ✓；About 标题译中（内容保持原文 ✓）；补齐 16 条词条 ✓ |
+| **开箱即用** | CN 区域 / LONG_FAST / 频点1 / 时区 CST-8 / 默认关 WiFi / 位置精度 32 ✓ |
+| **其它** | 环境模块延迟初始化并注册读数列表 ✓；繁体精简等 ✓ |
 
-</div>
+## 硬件（本分支适配的板子）
 
-</div>
+- T-Deck 克隆板（ESP32-S3）· 3.2" 触摸 TFT · GPS(RX 19/TX 20) · SD 卡
+- I²C：SDA 18 / SCL 8（触摸 + 传感器 0x76/0x77 + RTC PCF8563 0x51）
+- SPI：SCK 40 / MISO 38 / MOSI 41 / SD_CS 39（**屏/电台/SD 共用** ✗ 需注意时序）
+- ⚠️ GPIO21 = IP5306 电源键线（**不是**蜂鸣器 ✗）；蜂鸣器在 GPIO6
+- ⚠️ 无官方键盘（0x55 地址是空的 ✗ ⇒ 已关其轮询）
 
-<div align="center">
-	<a href="https://meshtastic.org">Website</a>
-	-
-	<a href="https://meshtastic.org/docs/">Documentation</a>
-</div>
+## 构建
 
-## Overview
+```bash
+cd <repo>
+/home/x1000qaq/.pio-venv/bin/pio run -e t-deck-tft     # 或用你本机的 pio
+```
 
-This repository contains the official device firmware for Meshtastic, an open-source LoRa mesh networking project designed for long-range, low-power communication without relying on internet or cellular infrastructure. The firmware supports various hardware platforms, including ESP32, nRF52, RP2040/RP2350, and Linux-based devices.
+- UI 库（device-ui）**已内嵌**在 `libs/device-ui/` ✓ ⇒ **clone 即编** ✓（无需外部依赖）
+- 产物：`.pio/build/t-deck-tft/firmware-t-deck-tft-<版本>.<git短哈希>.bin`
+  ⚠️ 文件名含 **git 短哈希** ⇒ 脚本里**别写死名字** ✗
 
-Meshtastic enables text messaging, location sharing, and telemetry over a decentralized mesh network, making it ideal for outdoor adventures, emergency preparedness, and remote operations.
+## 烧录
 
-### Get Started
+```
+偏移 0x10000（应用分区）· esptool 写 flash · 设备进下载模式（按住中键 + 插 USB）
+python -m esptool --chip esp32s3 --port <COM> write-flash 0x10000 <bin>
+```
 
-- 🔧 **[Building Instructions](https://meshtastic.org/docs/development/firmware/build)** – Learn how to compile the firmware from source.
-- ⚡ **[Flashing Instructions](https://meshtastic.org/docs/getting-started/flashing-firmware/)** – Install or update the firmware on your device.
+## 许可与致谢
 
-Join our community and help improve Meshtastic! 🚀
+- 本分支基于 **Meshtastic firmware**（**GPLv3**）✓ ⇒ 本分支同样以 **GPLv3** 发布 ✓
+  （见仓库根 `LICENSE`；上游原文见 `README-upstream.md`）
+- 上游项目：https://github.com/meshtastic/firmware
+- 硬件与思路上受一位热爱 LoRa 的朋友启发（其自制小板与配套资料为闭源，**未包含在本仓库** ✓）
 
-## Stats
+## 免责
 
-![Alt](https://repobeats.axiom.co/api/embed/8025e56c482ec63541593cc5bd322c19d5c0bdcf.svg "Repobeats analytics image")
+个人自用与学习目的 ✓ 请遵守当地无线电法规 ✓（CN 区域 tx_power 已按法规上限设置 ✓）
