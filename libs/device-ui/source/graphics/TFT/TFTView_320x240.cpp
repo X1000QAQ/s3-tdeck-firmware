@@ -2849,43 +2849,67 @@ void TFTView_320x240::loadMap(void)
                 int32_t lat = (long)p->LV_OBJ_IDX(node_pos1_idx)->user_data;
                 int32_t lon = (long)p->LV_OBJ_IDX(node_pos2_idx)->user_data;
                 if (lat && lon) {
-                    sortedLat.push_back(lat);
-                    sortedLon.push_back(lon);
+                    // v71: 收集时排除非法坐标（含 2^30「未设置位置」✗）
+                    if (MapTileSettings::isValidLatLon(lat * 1e-7f, lon * 1e-7f)) {
+                        sortedLat.push_back(lat);
+                        sortedLon.push_back(lon);
+                    }
                 }
             }
-            std::sort(sortedLat.begin(), sortedLat.end());
-            std::sort(sortedLon.begin(), sortedLon.end());
-            int64_t latcenter = 0;
-            int64_t loncenter = 0;
-            int32_t count = 0;
-            // select just the closest 60% of nodes, ignore the rest
-            int pp = 100 / 20;
-            for (int i = sortedLat.size() / pp; i < pp * sortedLat.size() / pp; i++) {
-                latcenter += sortedLat[i];
-                loncenter += sortedLon[i];
-                count++;
-            }
-            latcenter /= count;
-            loncenter /= count;
-            map->setHomeLocation(latcenter * 1e-7, loncenter * 1e-7);
+            // v71: ★ 无有效节点坐标时【不能】求均值（会除零/越界 ✗）⇒ 走 C' 回退
+            if (sortedLat.empty()) {
+                // C': 优先用【本机自己的有效缓存位置】✓（这样地图跟着你走 ✓）
+                int32_t ownLat = 0, ownLon = 0;
+                auto ownIt = nodes.find(ownNode);
+                if (ownIt != nodes.end()) {
+                    ownLat = (long)ownIt->second->LV_OBJ_IDX(node_pos1_idx)->user_data;
+                    ownLon = (long)ownIt->second->LV_OBJ_IDX(node_pos2_idx)->user_data;
+                }
+                if (MapTileSettings::isValidLatLon(ownLat * 1e-7f, ownLon * 1e-7f)) {
+                    map->setHomeLocation(ownLat * 1e-7f, ownLon * 1e-7f);
+                    map->setZoom(MapTileSettings::getDefaultZoom());
+                    ILOG_INFO("v71 map center: lat=%f lon=%f zoom=%u src=own-cache",
+                              ownLat * 1e-7f, ownLon * 1e-7f, MapTileSettings::getDefaultZoom());
+                } else {
+                    map->setHomeLocation(MapTileSettings::getDefaultLat(), MapTileSettings::getDefaultLon());
+                    map->setZoom(MapTileSettings::getDefaultZoom());
+                    ILOG_INFO("v71 map center: src=default(no valid node pos)");
+                }
+            } else {
+                std::sort(sortedLat.begin(), sortedLat.end());
+                std::sort(sortedLon.begin(), sortedLon.end());
+                int64_t latcenter = 0;
+                int64_t loncenter = 0;
+                int32_t count = 0;
+                // select just the closest 60% of nodes, ignore the rest
+                int pp = 100 / 20;
+                for (int i = sortedLat.size() / pp; i < pp * sortedLat.size() / pp; i++) {
+                    latcenter += sortedLat[i];
+                    loncenter += sortedLon[i];
+                    count++;
+                }
+                latcenter /= count;
+                loncenter /= count;
+                map->setHomeLocation(latcenter * 1e-7, loncenter * 1e-7);
 
-            // calculate optimal zoom factor to fit in all nodes of this range
-            lv_obj_update_layout(objects.raw_map_panel);
-            float rangeDeg = 1e-7 * (sortedLon[(pp - 1) * sortedLon.size() / pp] - sortedLon[sortedLon.size() / pp]);
-            float distanceKm = abs(rangeDeg * 111.32 * cos(1e-7 * sortedLat[sortedLat.size() / 2]));
-            uint32_t zoom = sqrt(156.543034f / distanceKm * abs(cos(1e-7 * sortedLat[sortedLat.size() / 2])) * 256) + 1;
-            // v64: 节点中心 + 自动 zoom 统一过校验（放在 zoom 声明之后 ✓）
-            {
-                float nLat = latcenter * 1e-7f, nLon = loncenter * 1e-7f;
-                uint8_t nZoom = (uint8_t)zoom;
-                bool nOk = MapTileSettings::sanitize(nLat, nLon, nZoom);
-                if (!nOk) {
-                    map->setHomeLocation(nLat, nLon);
-                    map->setZoom(nZoom);
-                    ILOG_INFO("v64 map center: lat=%f lon=%f zoom=%u src=nodes(fallback)", nLat, nLon, nZoom);
+                // calculate optimal zoom factor to fit in all nodes of this range
+                lv_obj_update_layout(objects.raw_map_panel);
+                float rangeDeg = 1e-7 * (sortedLon[(pp - 1) * sortedLon.size() / pp] - sortedLon[sortedLon.size() / pp]);
+                float distanceKm = abs(rangeDeg * 111.32 * cos(1e-7 * sortedLat[sortedLat.size() / 2]));
+                uint32_t zoom = sqrt(156.543034f / distanceKm * abs(cos(1e-7 * sortedLat[sortedLat.size() / 2])) * 256) + 1;
+                // v64: 节点中心 + 自动 zoom 统一过校验（放在 zoom 声明之后 ✓）
+                {
+                    float nLat = latcenter * 1e-7f, nLon = loncenter * 1e-7f;
+                    uint8_t nZoom = (uint8_t)zoom;
+                    bool nOk = MapTileSettings::sanitize(nLat, nLon, nZoom);
+                    if (!nOk) {
+                        map->setHomeLocation(nLat, nLon);
+                        map->setZoom(nZoom);
+                        ILOG_INFO("v64 map center: lat=%f lon=%f zoom=%u src=nodes(fallback)", nLat, nLon, nZoom);
+                    }
                 }
+                map->setZoom(zoom);
             }
-            map->setZoom(zoom);
         } else {
             // v64: 显式设置【编译期默认中心】+ zoomDefault（原来只 setZoom(3) 不设位置 ✗）
             map->setHomeLocation(MapTileSettings::getDefaultLat(), MapTileSettings::getDefaultLon());
@@ -5341,7 +5365,8 @@ void TFTView_320x240::updatePosition(uint32_t nodeNum, int32_t lat, int32_t lon,
         }
     }
 
-    if (lat != 0 && lon != 0) {
+    // v71: 非法坐标（含 2^30「未设置位置」✗）⇒ 不显示坐标
+    if (lat != 0 && lon != 0 && MapTileSettings::isValidLatLon(lat * 1e-7f, lon * 1e-7f)) {
         char buf[32];
         sprintf(buf, "%.5f %.5f", lat * 1e-7, lon * 1e-7);
         lv_obj_t *panel = nodes[nodeNum];
@@ -5364,6 +5389,12 @@ void TFTView_320x240::updatePosition(uint32_t nodeNum, int32_t lat, int32_t lon,
 
 void TFTView_320x240::updateDistance(uint32_t nodeNum, int32_t lat, int32_t lon)
 {
+    // v71: 任一方坐标非法（含 2^30）⇒ 不算距离（否则会出现荒谬值 ✗）
+    if (!MapTileSettings::isValidLatLon(lat * 1e-7f, lon * 1e-7f) ||
+        !MapTileSettings::isValidLatLon(myLatitude * 1e-7f, myLongitude * 1e-7f)) {
+        ILOG_DEBUG("v71: skip distance (invalid lat/lon) node=%08x", nodeNum);
+        return;
+    }
     // if we know our position then calculate (simple) distance to other node in km
     float dx = 71.5 * 1e-7 * (myLongitude - lon);
     float dy = 111.3 * 1e-7 * (myLatitude - lat);

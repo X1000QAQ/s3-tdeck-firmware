@@ -147,15 +147,21 @@ bool BMP280Sensor::getMetrics(meshtastic_Telemetry *measurement)
     if (!g_ready || !g_bus)
         return false;
 
-    measurement->variant.environment_metrics.has_temperature = true;
-    measurement->variant.environment_metrics.has_barometric_pressure = true;
-
     uint8_t d[6];
     if (!rd(g_bus, g_addr, BMP280_REG_DATA, d, 6)) {
-        measurement->variant.environment_metrics.temperature = BMP280_FAIL_SENTINEL_TEMP;
-        measurement->variant.environment_metrics.barometric_pressure = BMP280_FAIL_SENTINEL_PRESS;
-        return true;
+        // v72: 读失败 ⇒ 先【重试一次】（I²C 总线偶发错误 ✓）
+        //      仍失败 ⇒ 【不上报】（原来的做法是报 -88 / 777 哨兵值 ✗
+        //      ⇒ 屏幕上出现 777（气压位）✗ 且被上层当成有效值 ✗）
+        if (!rd(g_bus, g_addr, BMP280_REG_DATA, d, 6)) {
+            LOG_WARN("v72: sensor data read failed ⇒ skip this cycle (不再报哨兵值 ✓)");
+            return false;
+        }
+        LOG_INFO("v72: sensor data read ok on 2nd try");
     }
+
+    // v72: 只有【读成功】才声明这两个字段有效 ✓（原来在读之前就置位 ✗）
+    measurement->variant.environment_metrics.has_temperature = true;
+    measurement->variant.environment_metrics.has_barometric_pressure = true;
 
     int32_t adc_P = (int32_t)(((uint32_t)d[0] << 12) | ((uint32_t)d[1] << 4) | ((uint32_t)d[2] >> 4));
     int32_t adc_T = (int32_t)(((uint32_t)d[3] << 12) | ((uint32_t)d[4] << 4) | ((uint32_t)d[5] >> 4));
