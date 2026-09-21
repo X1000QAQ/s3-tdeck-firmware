@@ -15,7 +15,13 @@
 
 // Device specific curves go in variant.h
 #ifndef OCV_ARRAY
-#define OCV_ARRAY 4190, 4050, 3990, 3890, 3800, 3720, 3630, 3530, 3420, 3300, 3100
+// S3（T-Deck 克隆板）专用（2026-09-21）：首项 4190 → 4165
+//   为什么：表要求 ≥4.19V 才给 100%，而锂电的 4.2V 是【充电截止】电压，静置回落（relaxation）后
+//   本板电池实测真满静置只有 **4.175V**（万用表）⇒ 用原表永远显示 96~99% ✗
+//   现把 100% 阈值定在 4165mV（= 真满 4175mV − 10mV 余量，抗 ADC 抖动）✓
+//   中低段（4050 及以下）保持上游原值不动 ✓
+//   ⚠️ 与 C3 树是两份独立副本，互不影响 ✓
+#define OCV_ARRAY 4165, 4050, 3990, 3890, 3800, 3720, 3630, 3530, 3420, 3300, 3100
 #endif
 
 /*Note: 12V lead acid is 6 cells, most board accept only 1 cell LiIon/LiPo*/

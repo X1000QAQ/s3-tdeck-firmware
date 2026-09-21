@@ -62,7 +62,14 @@
 
 #define BATTERY_PIN 4 // A battery voltage measurement pin, voltage divider connected here to measure battery voltage
 // ratio of voltage divider = 2.0 (RD2=100k, RD3=100k)
-#define ADC_MULTIPLIER 2.0   // 2026-09-19 改回真实分压比（官方原理图 RD2/RD3=100K/100K ⇒ 2.0）；2.11 会让满电上报 ~4.42V 永久越过 4200mV 充电阈 // 2.0 + 10% for correction of display undervoltage.
+//
+// 2026-09-21 实测校准：2.0 → **2.062**
+//   同一状态实测：拔电后屏幕 **4.05V** vs 万用表电池端 **4.175V** ⇒ 比值 1.0309
+//   ⇒ 2.0 × 1.0309 = **2.062** ⇒ 原来的 2.0 偏低约 3%（读数偏低，电量也偏低）✗
+//   注：2.0 是「原理图理想值」（两颗 100K），而实际电阻有 ±1% 容差 + 走线/分压误差 ⇒ 必须实测校准 ✓
+//   参考：上游/商家用 **2.11**（偏高约 2.3%）—— 也不算错，只是另一种偏法；三者里 2.062 最接近真值 ✓
+//   （旧注释曾断言「2.11 会让满电上报 ~4.42V」——那是把理想值当真值得出的结论，已被本次实测推翻）
+#define ADC_MULTIPLIER 2.062
 #define ADC_CHANNEL ADC1_GPIO4_CHANNEL
 
 // keyboard

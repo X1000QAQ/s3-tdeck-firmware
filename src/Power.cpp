@@ -530,7 +530,15 @@ class AnalogBatteryLevel : public HasBatteryLevel
     /// For heltecs with no battery connected, the measured voltage is 2204, so
     // need to be higher than that, in this case is 2500mV (3000-500)
     const uint16_t OCV[NUM_OCV_POINTS] = {OCV_ARRAY};
-    const float chargingVolt = (OCV[0] + 10) * NUM_CELLS;
+    // 2026-09-21 解耦：充电/USB 判定阈值【不再】从 OCV 首项派生 ✗
+    //   为什么：本板无 USB 检测脚，isVbusIn() 用「电压 > chargingVolt」推断外部供电；
+    //   而 OCV 首项是「满电 = 100%」的阈值（已按电池实测下调到 4165）⇒ 派生会把判定阈值一起拉低
+    //   ⇒ 实测后果：电池静置 4.175~4.19V 时被误判为「在充电」✗（用户 2026-09-21 撞到）
+    //   ⇒ 改成固定 4200mV（可用 -D CHARGING_VOLT_MV 覆盖）✓
+#ifndef CHARGING_VOLT_MV
+#define CHARGING_VOLT_MV 4200
+#endif
+    const float chargingVolt = CHARGING_VOLT_MV * NUM_CELLS;
     const float noBatVolt = (OCV[NUM_OCV_POINTS - 1] - 500) * NUM_CELLS;
     // Start value from minimum voltage for the filter to not start from 0
     // that could trigger some events.
