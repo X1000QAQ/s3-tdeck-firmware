@@ -2865,7 +2865,9 @@ void TFTView_320x240::loadMap(void)
                     ownLat = (long)ownIt->second->LV_OBJ_IDX(node_pos1_idx)->user_data;
                     ownLon = (long)ownIt->second->LV_OBJ_IDX(node_pos2_idx)->user_data;
                 }
-                if (MapTileSettings::isValidLatLon(ownLat * 1e-7f, ownLon * 1e-7f)) {
+                // v73: 必须与上面收集节点时一样要求【非零】✗ —— 只过 isValidLatLon 不够：
+                //      (0,0) 是「没位置」的哨兵，光查范围会把它当合法位置 ⇒ 地图中心去 Null Island ⇒ 全灰 ✓
+                if (ownLat && ownLon && MapTileSettings::isValidLatLon(ownLat * 1e-7f, ownLon * 1e-7f)) {
                     map->setHomeLocation(ownLat * 1e-7f, ownLon * 1e-7f);
                     map->setZoom(MapTileSettings::getDefaultZoom());
                     ILOG_INFO("v71 map center: lat=%f lon=%f zoom=%u src=own-cache",

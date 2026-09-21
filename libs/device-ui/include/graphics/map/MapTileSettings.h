@@ -26,10 +26,18 @@ class MapTileSettings
     //   ⇒ 所有来源（home / 实时位置 / 节点中心 / 默认）进入地图前都必须过这里 ✓
     //
     //   ★ 注意包含 NaN 判断：!(x >= a && x <= b) 对 NaN 成立 ⇒ 返回 false ✓
+    //
+    //   v73: (0,0) 是「未设置位置」的哨兵值，必须判为非法 ✗
+    //        why：节点/本机缓存里没有位置时就是 lat=0 lon=0（不是 NaN、也没超范围 ✗）
+    //             旧版只查范围 ⇒ (0,0) 被判成合法 ⇒ 地图中心落到几内亚湾「Null Island」
+    //             ⇒ SD 上自然没有那里的中国瓦片 ⇒ 【地图全灰】✗（静默、且长按存 home 会把 0,0 永久写进 NVS ✗）
+    //        实测：刷 v1.3 后 `v71 map center: lat=0.000000 lon=0.000000 zoom=13 src=own-cache`
+    //              ⇒ 瓦片请求 13/4096/4096 ⇒ 全灰 ✓（复现）
     static bool isValidLatLon(float lat, float lon)
     {
         if (!(lat >= -85.0511f && lat <= 85.0511f)) return false;
         if (!(lon >= -180.0f && lon <= 180.0f)) return false;
+        if (lat == 0.0f && lon == 0.0f) return false; // v73: 未设置位置的哨兵值
         return true;
     }
     static bool isValidZoom(uint8_t z) { return z >= 1 && z <= 19; }
